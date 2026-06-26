@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema({
 
 
 userSchema.pre('save', async function(next) {
-  // Hešira se samo ako je lozinka modifikovana ili je nova
+ 
   if (!this.isModified('lozinka')) {
     return next();
   }

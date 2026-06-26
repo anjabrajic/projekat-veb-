@@ -14,8 +14,10 @@ const Cart = () => {
 
   const ukupnaCena = cartItems.reduce((sum, item) => sum + (item.cena * item.kolicina), 0);
 
-  // Funkcija koja se poziva nakon uspešnog plaćanja
-  const handlePaymentSuccess = async (paymentDetails) => {
+  const [nacinPlacanja, setNacinPlacanja] = useState('pouzece'); // 'pouzece' ili 'paypal'
+
+  // Funkcija za kreiranje porudžbine (za oba načina plaćanja)
+  const handleCreateOrder = async (isPaid = false) => {
     setPaymentError('');
     // Priprema stavki u formatu koji backend očekuje
     const stavke = cartItems.map(item => ({
@@ -26,11 +28,10 @@ const Cart = () => {
 
     try {
       // Slanje zahteva backendu za kreiranje porudžbine
-      // Axios automatski šalje token ako je postavljen u AuthContext.jsx
       const res = await axios.post('/api/orders', {
         stavke,
         ukupnaCena,
-        statusPlacanja: true // Označavamo kao plaćeno
+        statusPlacanja: isPaid
       });
 
       console.log('Porudžbina je kreirana na backendu:', res.data);
@@ -274,63 +275,137 @@ const Cart = () => {
               </span>
             </div>
 
-            {/* INTEGRACIJA PAYPAL-A */}
+            {/* IZBOR NAČINA PLAĆANJA */}
             <div style={{ marginTop: '1.5rem' }}>
               <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'hsl(var(--text-secondary))', marginBottom: '1rem' }}>
-                Izaberite način online plaćanja:
+                Izaberite način plaćanja:
               </h4>
 
-              {/* PayPal provajder i dugmići */}
-              <PayPalScriptProvider options={{ 'client-id': 'test', currency: 'USD' }}>
-                <PayPalButtons
-                  style={{ layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' }}
-                  createOrder={(data, actions) => {
-                    // Konvertujemo cenu iz dinara (RSD) u dolare (USD) za PayPal Sandbox
-                    const iznosUSD = (ukupnaCena / 117).toFixed(2);
-                    return actions.order.create({
-                      purchase_units: [
-                        {
-                          amount: {
-                            value: iznosUSD
-                          },
-                          description: 'Kupovina zdrave hrane - Zeleni Kutak'
-                        }
-                      ]
-                    });
+              {/* Tasteri za izbor */}
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setNacinPlacanja('pouzece')}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: nacinPlacanja === 'pouzece' ? '2px solid hsl(var(--primary))' : '1px solid hsl(var(--border))',
+                    backgroundColor: nacinPlacanja === 'pouzece' ? 'hsl(var(--primary-light))' : 'hsl(var(--bg-card))',
+                    color: nacinPlacanja === 'pouzece' ? 'hsl(var(--primary))' : 'hsl(var(--text-secondary))',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-primary)',
+                    transition: 'var(--transition)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
                   }}
-                  onApprove={async (data, actions) => {
-                    const captureDetails = await actions.order.capture();
-                    await handlePaymentSuccess(captureDetails);
+                >
+                  💵 Plaćanje pouzećem
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNacinPlacanja('paypal')}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: nacinPlacanja === 'paypal' ? '2px solid hsl(var(--primary))' : '1px solid hsl(var(--border))',
+                    backgroundColor: nacinPlacanja === 'paypal' ? 'hsl(var(--primary-light))' : 'hsl(var(--bg-card))',
+                    color: nacinPlacanja === 'paypal' ? 'hsl(var(--primary))' : 'hsl(var(--text-secondary))',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-primary)',
+                    transition: 'var(--transition)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
                   }}
-                  onError={(err) => {
-                    console.error('PayPal greška pri plaćanju:', err);
-                    setPaymentError('Došlo je do greške prilikom obrade uplate preko PayPal-a.');
-                  }}
-                />
-              </PayPalScriptProvider>
+                >
+                  💳 PayPal / Kartica
+                </button>
+              </div>
 
-              {/* Brzi taster za offline/dev testiranje i simulaciju uplate */}
-              <button
-                onClick={() => handlePaymentSuccess({ id: 'SIMULIRAN_PAYPAL_ID_123' })}
-                style={{
-                  width: '100%',
-                  marginTop: '1rem',
-                  backgroundColor: 'hsl(var(--primary-light))',
-                  color: 'hsl(var(--primary))',
-                  border: '1px dashed hsl(var(--primary))',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '0.75rem',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-primary)',
-                  transition: 'var(--transition)'
-                }}
-                onMouseEnter={(e) => { e.target.style.backgroundColor = 'hsl(var(--primary))'; e.target.style.color = '#fff'; }}
-                onMouseLeave={(e) => { e.target.style.backgroundColor = 'hsl(var(--primary-light))'; e.target.style.color = 'hsl(var(--primary))'; }}
-              >
-                ⚡ Brza simulacija plaćanja (Zaobilazi PayPal login)
-              </button>
+              {nacinPlacanja === 'pouzece' ? (
+                /* OPCIJA 1: Plaćanje pouzećem */
+                <button
+                  onClick={() => handleCreateOrder(false)}
+                  style={{
+                    width: '100%',
+                    backgroundColor: 'hsl(var(--primary))',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1rem',
+                    fontSize: '1.05rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-primary)',
+                    boxShadow: '0 4px 12px hsl(var(--primary) / 0.25)',
+                    transition: 'var(--transition)'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'hsl(var(--primary-hover))'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'hsl(var(--primary))'}
+                >
+                  Potvrdi porudžbinu (Plaćanje pouzećem)
+                </button>
+              ) : (
+                /* OPCIJA 2: PayPal */
+                <div>
+                  <PayPalScriptProvider options={{ 'client-id': 'test', currency: 'USD' }}>
+                    <PayPalButtons
+                      style={{ layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' }}
+                      createOrder={(data, actions) => {
+                        const iznosUSD = (ukupnaCena / 117).toFixed(2);
+                        return actions.order.create({
+                          purchase_units: [
+                            {
+                              amount: {
+                                value: iznosUSD
+                              },
+                              description: 'Kupovina zdrave hrane - Zeleni Kutak'
+                            }
+                          ]
+                        });
+                      }}
+                      onApprove={async (data, actions) => {
+                        const captureDetails = await actions.order.capture();
+                        await handleCreateOrder(true);
+                      }}
+                      onError={(err) => {
+                        console.error('PayPal greška pri plaćanju:', err);
+                        setPaymentError('Došlo je do greške prilikom obrade uplate preko PayPal-a.');
+                      }}
+                    />
+                  </PayPalScriptProvider>
+
+                  {/* Brzi taster za testiranje (simulacija uplate) */}
+                  <button
+                    onClick={() => handleCreateOrder(true)}
+                    style={{
+                      width: '100%',
+                      marginTop: '1rem',
+                      backgroundColor: 'hsl(var(--primary-light))',
+                      color: 'hsl(var(--primary))',
+                      border: '1px dashed hsl(var(--primary))',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '0.75rem',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-primary)',
+                      transition: 'var(--transition)'
+                    }}
+                    onMouseEnter={(e) => { e.target.style.backgroundColor = 'hsl(var(--primary))'; e.target.style.color = '#fff'; }}
+                    onMouseLeave={(e) => { e.target.style.backgroundColor = 'hsl(var(--primary-light))'; e.target.style.color = 'hsl(var(--primary))'; }}
+                  >
+                    ⚡ Brza simulacija plaćanja (Zaobilazi PayPal login)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

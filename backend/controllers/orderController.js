@@ -49,7 +49,7 @@ const createOrder = async (req, res) => {
   }
 };
 
-
+// za admina da vidi sve porudzbine
 const getOrders = async (req, res) => {
   try {
     const orders = await Order.find({})
